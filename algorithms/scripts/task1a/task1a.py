@@ -35,6 +35,7 @@
 
 import os
 import rclpy
+from rclpy.executors import ExternalShutdownException
 import sys
 import cv2
 import math
@@ -60,21 +61,21 @@ camera_info_topic = '/camera/camera/color/camera_info'
 # The parent frame every ore transform is published against.
 base_frame = 'base_link'
 
-# HSV bounds per ore type (OpenCV: H 0-179, S/V 0-255). Taken from the diffuse colours in
-# models/<ore>/meshes/*.dae: azurite deep blue (H~113), malachite green (H~63), vanadinite
-# red (H~1, so it wraps round 0). The ore_package is purple (H~150) and falls between them.
+# HSV bounds per ore type (OpenCV: H 0-179, S/V 0-255). Measured on a saved sim frame:
+# azurite H105 S230, malachite H74 S223, vanadinite orange H10 S252. The Mars terrain is
+# also orange (H~8) but only S~160, so vanadinite is told apart by saturation alone.
+# The ore_package is purple (H~150) and falls between them.
 # TUNE: check against a saved frame (see SAVE_FRAME below) if a type is missed or leaks.
 ore_hsv_ranges = {
     'azurite_ore':    [((95, 120, 25), (130, 255, 255))],
     'malachite_ore':  [((40, 120, 25), (85, 255, 255))],
-    'vanadinite_ore': [((0, 140, 40), (8, 255, 255)), ((172, 140, 40), (179, 255, 255))],
+    'vanadinite_ore': [((4, 220, 60), (16, 255, 255))],
 }
 
-min_ore_area_px = 150          # contours smaller than this are noise, not ores
+min_ore_area_px = 80           # contours smaller than this are noise, not ores
 morph_kernel = np.ones((5, 5), np.uint8)
 
 # Ore collision box from models/<ore>/model.sdf: 0.1016 x 0.1016 x 0.0762 m.
-ore_half_xy = 0.1016 / 2.0
 ore_half_z = 0.0762 / 2.0
 
 depth_window = 4               # median over a (2*4+1)^2 patch around the centre pixel
@@ -284,7 +285,6 @@ class ore_tf(Node):
             self.get_logger().warn(f'waiting for TF {base_frame} <- {self.optical_frame}: {e}',
                                    throttle_duration_sec=2.0)
             return
-        cam = tf.transform.translation
 
         centers, types = detect_ores(image)
         fx, fy, cx, cy = (self.cam_info[k] for k in ('fx', 'fy', 'cx', 'cy'))
@@ -306,17 +306,11 @@ class ore_tf(Node):
             pt.point.z = z
             p = do_transform_point(pt, tf).point
 
-            # The depth hit is on the ore's visible surface; its centre lies further along
-            # the viewing ray by the box half-extent the ray crosses before reaching it.
-            ray = np.array([p.x - cam.x, p.y - cam.y, p.z - cam.z])
-            norm = np.linalg.norm(ray)
-            if norm < 1e-6:
-                continue
-            ray /= norm
-            horiz, vert = math.hypot(ray[0], ray[1]), abs(ray[2])
-            t = min(ore_half_xy / horiz if horiz > 1e-6 else math.inf,
-                    ore_half_z / vert if vert > 1e-6 else math.inf)
-            centre = np.array([p.x, p.y, p.z]) + ray * t
+            # The blob centre's depth hit lands on the ore's top face (the mast camera looks
+            # down steeply), so the centre is half the box height straight below it.
+            # Checked against Gazebo ground truth: stepping along the view ray instead
+            # overshot by ~3.5 cm horizontally.
+            centre = (p.x, p.y, p.z - ore_half_z)
             per_type[ore_type].append(((u, v), tuple(float(c) for c in centre)))
 
         for ore_type, detections in per_type.items():
@@ -370,7 +364,7 @@ def main():
 
     try:
         rclpy.spin(ore_tf_class)                                    # spining on the object to make it alive in ROS 2 DDS
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, ExternalShutdownException):
         pass
 
     ore_tf_class.destroy_node()                                     # destroy node after spin ends

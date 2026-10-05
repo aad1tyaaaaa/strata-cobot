@@ -32,6 +32,7 @@
 ################### IMPORT MODULES #######################
 
 import rclpy
+from rclpy.executors import ExternalShutdownException
 import sys
 import math
 import numpy as np
@@ -364,7 +365,7 @@ def main():
 
     try:
         rclpy.spin(ebot_nav_class)                                  # spining on the object to make it alive in ROS 2 DDS
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
         try:

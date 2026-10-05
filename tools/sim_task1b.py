@@ -7,11 +7,12 @@ import numpy as np
 from scipy.spatial.transform import Rotation
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-for m in ['rclpy', 'rclpy.node', 'control_msgs', 'control_msgs.msg', 'controller_manager_msgs',
+for m in ['rclpy', 'rclpy.node', 'rclpy.executors', 'control_msgs', 'control_msgs.msg', 'controller_manager_msgs',
           'controller_manager_msgs.srv', 'geometry_msgs', 'geometry_msgs.msg', 'sensor_msgs',
           'sensor_msgs.msg', 'std_msgs', 'std_msgs.msg']:
     sys.modules.setdefault(m, types.ModuleType(m))
 sys.modules['rclpy.node'].Node = object
+sys.modules['rclpy.executors'].ExternalShutdownException = Exception
 for m, n in [('control_msgs.msg', 'JointJog'), ('controller_manager_msgs.srv', 'SwitchController'),
              ('geometry_msgs.msg', 'PoseStamped'), ('geometry_msgs.msg', 'TwistStamped'),
              ('sensor_msgs.msg', 'JointState'), ('std_msgs.msg', 'Int32')]:

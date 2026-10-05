@@ -6,10 +6,11 @@ import math, os, sys, types, importlib.util
 import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-for m in ['rclpy', 'rclpy.node', 'rclpy.qos', 'tf2_ros', 'geometry_msgs', 'geometry_msgs.msg',
+for m in ['rclpy', 'rclpy.node', 'rclpy.executors', 'rclpy.qos', 'tf2_ros', 'geometry_msgs', 'geometry_msgs.msg',
           'nav_msgs', 'nav_msgs.msg', 'sensor_msgs', 'sensor_msgs.msg']:
     sys.modules.setdefault(m, types.ModuleType(m))
 sys.modules['rclpy.node'].Node = object
+sys.modules['rclpy.executors'].ExternalShutdownException = Exception
 for n in ['qos_profile_sensor_data', 'QoSProfile', 'HistoryPolicy', 'ReliabilityPolicy', 'DurabilityPolicy']:
     setattr(sys.modules['rclpy.qos'], n, None)
 for m, n in [('geometry_msgs.msg', 'Twist'), ('nav_msgs.msg', 'Odometry'), ('nav_msgs.msg', 'Path'),

@@ -34,6 +34,7 @@
 ################### IMPORT MODULES #######################
 
 import rclpy
+from rclpy.executors import ExternalShutdownException
 import sys
 import math
 import numpy as np
@@ -260,8 +261,11 @@ class arm_waypoints(Node):
         '''
 
         if data.data != self.arm_status:
-            log = self.get_logger().info if data.data == 0 else self.get_logger().warn
-            log(f'/arm_status -> {data.data} (see /arm_status_detail)')
+            # rclpy pins one severity per call site, so the two levels need two calls
+            if data.data == 0:
+                self.get_logger().info(f'/arm_status -> {data.data}')
+            else:
+                self.get_logger().warn(f'/arm_status -> {data.data} (see /arm_status_detail)')
         self.arm_status = data.data
 
 
@@ -385,7 +389,7 @@ def main():
 
     try:
         rclpy.spin(arm_waypoints_class)                             # spining on the object to make it alive in ROS 2 DDS
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, ExternalShutdownException):
         pass
 
     arm_waypoints_class.destroy_node()                              # destroy node after spin ends
